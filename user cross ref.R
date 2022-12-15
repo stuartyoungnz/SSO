@@ -1,10 +1,15 @@
 # this takes CSV files from different sources and compares them, 
 # SSO all users is downloaded from https://signin.aucklandcouncil.govt.nz/ofis/pages/config/_stats.aspx
-# 
+
+
+# ======== load libraries ========
 
 library(tidyverse)
 library(lubridate)
 library(janitor)
+
+
+# ======== read all data and assemble file ========
 
 # read all SSO users CSV
 all_sso <- read.csv("AllUsers.csv") |>
@@ -71,3 +76,33 @@ accomm_booking <- read.csv("data/accomm-booking-start.csv") |>
   
 # add accommodation booking data to all SSO
 all_sso <- left_join(all_sso,accomm_booking, key=email)
+
+# read library room booking
+libr_room_booking <- read.csv("U:/CityWide/Permanent/EBS Data Extract/SphereLibaryBookingsExtract.csv") |>
+  select(BookingStartDate,BookingStatus,ProfileEmail) |>
+  rename(email = ProfileEmail) |>
+  rename(libr_room_booking_status = BookingStatus) |>
+  mutate(libr_room_booking_created_date = dmy(BookingStartDate)) |>
+  distinct(email, .keep_all = TRUE) |>
+  # drop Datetime
+  select(2:4)
+
+# add library room booking data to all SSO
+all_sso <- left_join(all_sso,libr_room_booking, key=email)
+
+
+# read venue hire booking
+venue_csv_files <- fs::dir_ls("data/venue-hire/", regexp = "\\.csv$") |>
+  map_dfr(read_csv)
+  
+venue_hire_booking <- venue_csv_files |>
+  select(7,30) |>
+  rename(email = 'Profile Email') |>
+  distinct(email, .keep_all = TRUE) |>
+  rename(venue_hire_booking_status = 'Booking Status')
+
+
+# add venue hire booking data to all SSO
+all_sso <- left_join(all_sso,venue_hire_booking, key=email)
+
+# ======== read all data and assemble file ========
