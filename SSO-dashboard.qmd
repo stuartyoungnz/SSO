@@ -1,10 +1,29 @@
-# this takes a single CSV file containing all records, 
-# downloaded from https://signin.aucklandcouncil.govt.nz/ofis/pages/config/_stats.aspx
-# and determines various reports
+---
+title: "SSO"
+format: 
+   html:
+     df-print: paged
+editor: visual
+---
+
+## Single sign-on (SSO)
+
+This document reports the latest counts of single sign-on user accounts at Auckland Council.
+
+```{r}
+#| label: load-packages
+#| include: false
 
 library(tidyverse)
 library(lubridate)
 library(janitor)
+
+
+```
+
+```{r}
+#| label: read from CSV and process
+#| include: false
 
 # read from CSV
 allraw <- read.csv("AllUsers.csv") |>
@@ -42,16 +61,28 @@ creation_year <- group_by(all, created_year ) |>
   summarise(Count = sum(n)) |>
   adorn_totals("row")
 
-# summarise and add total row
-login_year_by_creation_year <- group_by(all, last_login_year, created_year ) |>
-  count() |>
-  summarise(Count = sum(n)) |>
-  adorn_totals("row")
+```
 
-creation_year_month <- group_by(all, created_year,created_month ) |>
-  count()  |>
-  summarise(Count = sum(n))
+*Report last updated: `r max_date$max_date`*
 
+The total number of SSO accounts created each year is shown in the table below.
+
+```{r}
+#| label: table_by_year
+#| echo: false
+
+creation_year
+
+```
+
+The total number of SSO accounts created each month is shown in the chart below.
+
+```{r}
+#| label: fig-by_month
+#| fig-cap: "Chart of monthly creation of single sign-on user accounts."
+#| echo: false
+
+# summarise by month
 creation_year_month2 <- group_by(all, created_month_year ) |>
   count()  |>
   summarise(Count = sum(n))
@@ -72,3 +103,7 @@ ggplot(creation_year_month2, aes(created_month_year, Count)) +
   ggtitle("Monthly SSO accounts created") +
   geom_line() + 
   geom_point()
+
+
+```
+
