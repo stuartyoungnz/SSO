@@ -4,6 +4,7 @@
 
 library(tidyverse)
 library(lubridate)
+library(janitor)
 
 # read from CSV
 allraw <- read.csv("AllUsers.csv") |>
@@ -32,17 +33,11 @@ all <-  select(allraw, 2:4) |>
 # remove outlier  
   filter(created_month_year != "2016-01-01")
 
-# summarise
+# summarise and add total row
 creation_year <- group_by(all, created_year ) |>
   count() |>
-  summarise(Count = sum(n))
-
-creation_year <- rbind(data.frame(creation_year, created_year='Total', t(colSums(creation_year[, -1]))))
-
-creation_year_new <- creation_year %>%
-  bind_rows(summarise(., across(where(is.numeric), sum),
-                      across(where(is.character), ~'Total')))
-
+  summarise(Count = sum(n)) |>
+  adorn_totals("row")
 
 creation_year_month <- group_by(all, created_year,created_month ) |>
   count()  |>
