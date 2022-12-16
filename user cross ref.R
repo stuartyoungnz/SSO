@@ -77,6 +77,23 @@ accomm_booking <- read.csv("data/accomm-booking-start.csv") |>
 # add accommodation booking data to all SSO
 all_sso <- left_join(all_sso,accomm_booking, key=email)
 
+
+# read Sphere user account
+sphere_account_raw <- read.csv("U:/CityWide/Permanent/EBS Data Extract/SphereUsersExtract.csv")
+
+sphere_account <- sphere_account_raw |>
+  select(CustomerNumber,ProfileEmail,LastAuthenticatedDate,CreatedDate) |>
+  rename(email = ProfileEmail) |>
+  rename(sphere_customer_id = CustomerNumber) |>
+  mutate(sphere_account_last_login_date = dmy(substr(LastAuthenticatedDate,1,10))) |>
+  mutate(sphere_account_created_date = dmy(CreatedDate)) |>
+  distinct(email, .keep_all = TRUE) |>
+  # drop Datetime (x2)
+  select(1,2,5,6)
+
+# add Sphere account to all SSO
+all_sso <- left_join(all_sso,sphere_account, key=email)
+
 # read library room booking
 libr_room_booking <- read.csv("U:/CityWide/Permanent/EBS Data Extract/SphereLibaryBookingsExtract.csv") |>
   select(BookingStartDate,BookingStatus,ProfileEmail) |>
@@ -105,4 +122,52 @@ venue_hire_booking <- venue_csv_files |>
 # add venue hire booking data to all SSO
 all_sso <- left_join(all_sso,venue_hire_booking, key=email)
 
-# ======== read all data and assemble file ========
+
+# read sports booking (Sphere)
+casual_sports_booking <- read.csv("U:/CityWide/Permanent/EBS Data Extract/SphereSportsCasualExtract.csv") |>
+  select(DateCreated,RegistrationEmail) |>
+  rename(email = RegistrationEmail) |>
+  mutate(sports_sphere_booking_created_date = dmy(DateCreated)) |>
+  distinct(email, .keep_all = TRUE) |>
+  # drop Datetime
+  select(2:3)
+seasonal_sports_booking <- read.csv("U:/CityWide/Permanent/EBS Data Extract/SphereSportsSeasonalExtract.csv") |>
+  select(DateCreated,PrimaryEmailAddress) |>
+  rename(email = PrimaryEmailAddress) |>
+  mutate(sports_sphere_booking_created_date = dmy(DateCreated)) |>
+  distinct(email, .keep_all = TRUE) |>
+  # drop Datetime
+  select(2:3)
+sports_booking_sphere <- bind_rows(casual_sports_booking,seasonal_sports_booking)
+
+
+# add sports sphere booking data to all SSO
+all_sso <- left_join(all_sso,sports_booking_sphere, key=email)
+
+# ======== analyse ========
+
+# count each one
+sphere_account_count <- all_sso |>
+  drop_na(sphere_customer_id) |>
+  count()
+venue_hire_count <- all_sso |>
+  filter(venue_hire_booking_status == 'Confirmed') |>
+  count()
+libr_room_booking_count <- all_sso |>
+  drop_na(libr_room_booking_status) |>
+  count()
+sports_sphere_booking_count <- all_sso |>
+  drop_na(sports_sphere_booking_created_date) |>
+  count()
+accomm_booking_count <- all_sso |>
+  drop_na(accomm_booking_status) |>
+  count()
+ma_dogs_count <- all_sso |>
+  filter(ma_dogs_update_type == 'New') |>
+  count()
+ma_rates_count <- all_sso |>
+  drop_na(ma_rates_permission) |>
+  count()
+
+
+
