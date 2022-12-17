@@ -17,6 +17,7 @@ This document reports the latest counts of single sign-on user accounts at Auckl
 library(tidyverse)
 library(lubridate)
 library(janitor)
+library(scales)
 
 
 ```
@@ -55,23 +56,47 @@ all <-  select(allraw, 2:4) |>
 # get max date
 max_date <- summarise(all, max_date = max(created_date))
 
-# summarise and add total row
+# ======== determine active users ========
+# get date 6 months prior to today's date
+date_to_check <- Sys.Date() %m-% months(6)
+
+# check for dates after that date. 
+# Does not handle NA correctly
+all <- all |>
+  mutate(active_user = ifelse(created_date >= date_to_check, "yes", ifelse(last_login_date >= date_to_check, "yes", "no"))) |>
+  relocate(active_user, .before = created_year)
+
+# summarise all accounts and add total row 
 creation_year <- group_by(all, created_year ) |>
   count() |>
-  summarise(Count = sum(n)) |>
+  summarise(count = sum(n)) |>
   adorn_totals("row")
+
+# summarise active users and add total row
+creation_year_active <- all |>
+  filter(active_user == "yes") |>
+  group_by(created_year) |>
+  count() |>
+  summarise(active = sum(n)) |>
+  adorn_totals("row")
+
+# join all and active
+creation_year_all_with_active <- 
+  left_join(creation_year,creation_year_active, key=created_year) |>
+  mutate(percent_active = (active/count), percent_active = scales::percent(percent_active))
+
 
 ```
 
 *Report last updated: `r max_date$max_date`*
 
-The total number of SSO accounts created each year is shown in the table below.
+The total number of SSO accounts created each year is shown in the table below, along with the number and percentage that were used within the last 6 months.
 
 ```{r}
 #| label: table_by_year
 #| echo: false
 
-creation_year
+creation_year_all_with_active
 
 ```
 
@@ -106,4 +131,3 @@ ggplot(creation_year_month2, aes(created_month_year, Count)) +
 
 
 ```
-

@@ -5,6 +5,7 @@
 library(tidyverse)
 library(lubridate)
 library(janitor)
+library(scales)
 
 # read from CSV
 allraw <- read.csv("AllUsers.csv") |>
@@ -36,11 +37,38 @@ all <-  select(allraw, 2:4) |>
 # get max date
 max_date <- summarise(all, max_date = max(created_date))
 
-# summarise and add total row
+
+# ======== determine active users ========
+# get date 6 months prior to today's date
+date_to_check <- Sys.Date() %m-% months(6)
+
+# check for dates after that date. 
+# Does not handle NA correctly
+all <- all |>
+  mutate(active_user = ifelse(created_date >= date_to_check, "yes", ifelse(last_login_date >= date_to_check, "yes", "no"))) |>
+  relocate(active_user, .before = created_year)
+
+
+# summarise all accounts and add total row 
 creation_year <- group_by(all, created_year ) |>
   count() |>
-  summarise(Count = sum(n)) |>
+  summarise(count = sum(n)) |>
   adorn_totals("row")
+
+# summarise active users and add total row
+creation_year_active <- all |>
+  filter(active_user == "yes") |>
+  group_by(created_year) |>
+  count() |>
+  summarise(active = sum(n)) |>
+  adorn_totals("row")
+
+# join all and active
+creation_year_all_with_active <- 
+  left_join(creation_year,creation_year_active, key=created_year) |>
+  mutate(percent_active = (active/count), percent_active = scales::percent(percent_active))
+
+
 
 # summarise and add total row
 login_year_by_creation_year <- group_by(all, last_login_year, created_year ) |>
@@ -48,10 +76,6 @@ login_year_by_creation_year <- group_by(all, last_login_year, created_year ) |>
   summarise(Count = sum(n)) |>
   adorn_totals("row")
 
-# summarise and add total row with active users too
-creation_year_with_active <- group_by(all, created_year, active_user ) |>
-  count() |>
-  adorn_totals("row")
 
 creation_year_month <- group_by(all, created_year,created_month ) |>
   count()  |>
@@ -78,15 +102,4 @@ ggplot(creation_year_month2, aes(created_month_year, Count)) +
   geom_line() + 
   geom_point()
 
-
-# ======== determine active users ========
-
-# get date 6 months prior to today's date
-date_to_check <- Sys.Date() %m-% months(6)
-
-# check for dates after that date. 
-# Does not handle NA correctly
-all <- all |>
-  mutate(active_user = ifelse(created_date >= date_to_check, "yes", ifelse(last_login_date >= date_to_check, "yes", "no"))) |>
-  relocate(active_user, .before = created_year)
 
