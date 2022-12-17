@@ -144,6 +144,19 @@ sports_booking_sphere <- bind_rows(casual_sports_booking,seasonal_sports_booking
 # add sports sphere booking data to all SSO
 all_sso <- left_join(all_sso,sports_booking_sphere, key=email)
 
+
+# ======== determine active users ========
+
+# get date 6 months prior to today's date
+date_to_check <- Sys.Date() %m-% months(6)
+
+# check for dates after that date. 
+# Does not handle NA correctly
+all_sso <- all_sso |>
+  mutate(active_user = ifelse(sso_created_date >= date_to_check, "yes", ifelse(sso_last_login_date >= date_to_check, "yes", "no"))) |>
+  relocate(active_user, .before = ma_rates_permission)
+
+
 # ======== analyse ========
 
 # count each one
@@ -168,6 +181,28 @@ ma_dogs_count <- all_sso |>
 ma_rates_count <- all_sso |>
   drop_na(ma_rates_permission) |>
   count()
+
+
+# intersection of each one
+ma_rates_intersect <- all_sso |>
+  drop_na(ma_rates_permission)
+ma_rates_intersect_dogs <- ma_rates_intersect |>
+  filter(ma_dogs_update_type == 'New') |>
+  count()
+ma_rates_intersect_accomm <- ma_rates_intersect |>
+  drop_na(accomm_booking_status) |>
+  count()
+ma_rates_intersect_venue <- ma_rates_intersect |>
+  drop_na(venue_hire_booking_status) |>
+  count()
+ma_rates_intersect_library <- ma_rates_intersect |>
+  drop_na(libr_room_booking_status) |>
+  count()
+ma_rates_intersect_sports <- ma_rates_intersect |>
+  drop_na(sports_sphere_booking_created_date) |>
+  count()
+
+
 
 
 

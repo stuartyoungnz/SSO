@@ -48,6 +48,11 @@ login_year_by_creation_year <- group_by(all, last_login_year, created_year ) |>
   summarise(Count = sum(n)) |>
   adorn_totals("row")
 
+# summarise and add total row with active users too
+creation_year_with_active <- group_by(all, created_year, active_user ) |>
+  count() |>
+  adorn_totals("row")
+
 creation_year_month <- group_by(all, created_year,created_month ) |>
   count()  |>
   summarise(Count = sum(n))
@@ -72,3 +77,16 @@ ggplot(creation_year_month2, aes(created_month_year, Count)) +
   ggtitle("Monthly SSO accounts created") +
   geom_line() + 
   geom_point()
+
+
+# ======== determine active users ========
+
+# get date 6 months prior to today's date
+date_to_check <- Sys.Date() %m-% months(6)
+
+# check for dates after that date. 
+# Does not handle NA correctly
+all <- all |>
+  mutate(active_user = ifelse(created_date >= date_to_check, "yes", ifelse(last_login_date >= date_to_check, "yes", "no"))) |>
+  relocate(active_user, .before = created_year)
+
