@@ -7,6 +7,7 @@
 library(tidyverse)
 library(lubridate)
 library(janitor)
+library(scales)
 
 
 # ======== read all data and assemble file ========
@@ -144,6 +145,18 @@ sports_booking_sphere <- bind_rows(casual_sports_booking,seasonal_sports_booking
 # add sports sphere booking data to all SSO
 all_sso <- left_join(all_sso,sports_booking_sphere, key=email)
 
+# read Hybris orders
+hybris_orders_csv_files <- fs::dir_ls("data/hybris-orders/", regexp = "\\.csv$") |>
+  map_dfr(read_csv) |>
+  select(3,7,8) |>
+  rename(email = 'Email') |>
+  distinct(email, .keep_all = TRUE) |>
+  rename(hybris_order_date = 'Hybris Form Lodged Calendar Date Dt') |>
+  rename(hybris_order_type = 'Class Code')
+
+
+# add hybris orders data to all SSO
+all_sso <- left_join(all_sso,hybris_orders_csv_files, key=email)
 
 # ======== determine active users ========
 
@@ -181,7 +194,105 @@ ma_dogs_count <- all_sso |>
 ma_rates_count <- all_sso |>
   drop_na(ma_rates_permission) |>
   count()
+bc_count <- all_sso |>
+  filter(hybris_order_type == 'BC') |>
+  count()
+rc_count <- all_sso |>
+  filter(hybris_order_type == 'RC') |>
+  count()
+licence_count <- all_sso |>
+  filter(hybris_order_type == 'Licence') |>
+  count()
+bwof_count <- all_sso |>
+  filter(hybris_order_type == 'BWOF Renewal') |>
+  count()
 
+
+# count active for each one
+sphere_account_active_count <- all_sso |>
+  drop_na(sphere_customer_id) |>
+  filter(active_user == "yes") |>
+  count()
+venue_hire_active_count <- all_sso |>
+  filter(venue_hire_booking_status == 'Confirmed') |>
+  filter(active_user == "yes") |>
+  count()
+libr_room_booking_active_count <- all_sso |>
+  drop_na(libr_room_booking_status) |>
+  filter(active_user == "yes") |>
+  count()
+sports_sphere_booking_active_count <- all_sso |>
+  drop_na(sports_sphere_booking_created_date) |>
+  filter(active_user == "yes") |>
+  count()
+accomm_booking_active_count <- all_sso |>
+  drop_na(accomm_booking_status) |>
+  filter(active_user == "yes") |>
+  count()
+ma_dogs_active_count <- all_sso |>
+  filter(ma_dogs_update_type == 'New') |>
+  filter(active_user == "yes") |>
+  count()
+ma_rates_active_count <- all_sso |>
+  drop_na(ma_rates_permission) |>
+  filter(active_user == "yes") |>
+  count()
+bc_active_count <- all_sso |>
+  filter(hybris_order_type == 'BC') |>
+  filter(active_user == "yes") |>
+  count()
+rc_active_count <- all_sso |>
+  filter(hybris_order_type == 'RC') |>
+  filter(active_user == "yes") |>
+  count()
+licence_active_count <- all_sso |>
+  filter(hybris_order_type == 'Licence') |>
+  filter(active_user == "yes") |>
+  count()
+bwof_active_count <- all_sso |>
+  filter(hybris_order_type == 'BWOF Renewal') |>
+  filter(active_user == "yes") |>
+  count()
+
+
+
+# assemble data frame for totals and active totals
+product_with_active <- data.frame(
+  product = c("myAUCKLAND Dogs",
+              "myAUCKLAND Rates",
+              "Accomm booking",
+              "Venue hire",
+              "Library room booking",
+              "Sports field booking (OLD)",
+              "BC orders",
+              "RC orders",
+              "Licence orders",
+              "BWOF renewals"
+              ),
+  total = c(ma_dogs_count$n[1],
+            ma_rates_count$n[1],
+            accomm_booking_count$n[1],
+            venue_hire_count$n[1],
+            libr_room_booking_count$n[1],
+            sports_sphere_booking_count$n[1],
+            bc_count$n[1],
+            rc_count$n[1],
+            licence_count$n[1],
+            bwof_count$n[1]
+            ),
+  active = c(ma_dogs_active_count$n[1],
+             ma_rates_active_count$n[1],
+             accomm_booking_active_count$n[1],
+             venue_hire_active_count$n[1],
+             libr_room_booking_active_count$n[1],
+             sports_sphere_booking_active_count$n[1],
+             bc_active_count$n[1],
+             rc_active_count$n[1],
+             licence_active_count$n[1],
+             bwof_active_count$n[1]
+             )
+) |>
+  mutate(percent_active = (active/total), percent_active = scales::percent(percent_active))
 
 # intersection of each one
 ma_rates_intersect <- all_sso |>

@@ -42,7 +42,7 @@ max_date <- summarise(all, max_date = max(created_date))
 # get date 6 months prior to today's date
 date_to_check <- Sys.Date() %m-% months(6)
 
-# check for dates after that date. 
+# check for dates after that date.
 # Does not handle NA correctly
 all <- all |>
   mutate(active_user = ifelse(created_date >= date_to_check, "yes", ifelse(last_login_date >= date_to_check, "yes", "no"))) |>
