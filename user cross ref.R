@@ -51,6 +51,7 @@ all_sso <- left_join(all_sso,ma_rates, key=email)
 # get max date myAUCKLAND rates
 max_date_ma_rates <- summarise(ma_rates, max_date = max(ma_rates_created_date))
 
+
 # read myAUCKLAND dogs CSV
 ma_dogs <- read.csv("data/myAUCKLAND-dogs-start.csv") |>
   # trim cols
@@ -240,7 +241,34 @@ all_sso <- all_sso |>
   relocate(active_user, .before = ma_rates_permission)
 
 
+# ======== determine total services ========
+
+all_sso <- all_sso |>
+  mutate (total_services = 
+            ifelse(!is.na(ma_rates_created_date), 1,0) +
+            ifelse(!is.na(ma_dogs_created_date), 1,0) +
+            ifelse(!is.na(accomm_booking_created_date), 1,0) +
+            ifelse(!is.na(libr_room_booking_date), 1,0) +
+            ifelse(!is.na(venue_hire_booking_status), 1,0) +
+            ifelse(!is.na(sports_sphere_booking_created_date), 1,0) +
+            ifelse(!is.na(hybris_order_bc), 1,0) +
+            ifelse(!is.na(hybris_order_rc), 1,0) +
+            ifelse(!is.na(hybris_order_licence), 1,0) +
+            ifelse(!is.na(hybris_order_bwof), 1,0) +
+            ifelse(!is.na(solicitors_created_date), 1,0)
+          )
+
+view(all_sso)
+
+
 # ======== analyse 1. counts / totals ========
+
+# count distribution of number of products
+
+count_number_products <- all_sso |>
+  group_by(total_services) |>
+  count()
+view(count_number_products)
 
 # count each one
 
@@ -1302,3 +1330,7 @@ none_intersect_results <- data.frame(
   mutate(percent_users = (no_others/total), percent_users = scales::percent(percent_users))
 
 view(none_intersect_results)
+
+
+
+
