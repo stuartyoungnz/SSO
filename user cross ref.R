@@ -8,7 +8,7 @@ library(tidyverse)
 library(lubridate)
 library(janitor)
 library(scales)
-
+library(readxl)
 
 # ======== read all data and assemble main data frame ========
 
@@ -166,20 +166,66 @@ all_sso <- left_join(all_sso,sports_booking_sphere, key=email)
 max_date_sports_sphere_booking <- summarise(sports_booking_sphere, max_date = max(sports_sphere_booking_created_date))
 
 
-# read Hybris orders
+# read Hybris orders and process
 hybris_orders_csv_files <- fs::dir_ls("data/hybris-orders/", regexp = "\\.csv$") |>
   map_dfr(read_csv) |>
   select(3,7,8) |>
   rename(email = 'Email') |>
-  distinct(email, .keep_all = TRUE) |>
+  rename(hybris_order_type = 'Class Code') |>
   rename(hybris_order_date = 'Hybris Form Lodged Calendar Date Dt') |>
-  rename(hybris_order_type = 'Class Code')
+  mutate(across('hybris_order_type', str_replace, 'BC-Streamline', 'BC'))
 
-# add hybris orders data to all SSO
-all_sso <- left_join(all_sso,hybris_orders_csv_files, key=email)
+# split Hybris orders
+hybris_orders_bc <- hybris_orders_csv_files |>
+  filter(hybris_order_type == 'BC') |>
+  rename(hybris_order_bc = hybris_order_type) |>
+  rename(hybris_order_date_bc = hybris_order_date) |>
+  distinct(email, .keep_all = TRUE)
+hybris_orders_rc <- hybris_orders_csv_files |>
+  filter(hybris_order_type == 'RC') |>
+  rename(hybris_order_rc = hybris_order_type) |>
+  rename(hybris_order_date_rc = hybris_order_date) |>
+  distinct(email, .keep_all = TRUE)
+hybris_orders_licence <- hybris_orders_csv_files |>
+  filter(hybris_order_type == 'Licence') |>
+  rename(hybris_order_licence = hybris_order_type) |>
+  rename(hybris_order_date_licence = hybris_order_date) |>
+  distinct(email, .keep_all = TRUE)
+hybris_orders_bwof <- hybris_orders_csv_files |>
+  filter(hybris_order_type == 'BWOF Renewal') |>
+  rename(hybris_order_bwof = hybris_order_type) |>
+  rename(hybris_order_date_bwof = hybris_order_date) |>
+  distinct(email, .keep_all = TRUE)
+
+# add BC orders data to all SSO
+all_sso <- left_join(all_sso,hybris_orders_bc, key=email)
+# add RC orders data to all SSO
+all_sso <- left_join(all_sso,hybris_orders_rc, key=email)
+# add Licence orders data to all SSO
+all_sso <- left_join(all_sso,hybris_orders_licence, key=email)
+# add BWOF orders data to all SSO
+all_sso <- left_join(all_sso,hybris_orders_bwof, key=email)
 
 # get max date hybris orders
 max_date_hybris_orders <- summarise(hybris_orders_csv_files, max_date = max(hybris_order_date))
+
+
+# read solicitors CSV
+solicitors <- read_xlsx("data/Solicitor Users List 2022.xlsx") |>
+  # rename columns
+  rename(email = p_uid) |>
+  # convert dates to R dates
+  mutate(solicitors_created_date = ymd(substr(createdTS,1,10))) |>
+  # remove rows with duplicate email addresses
+  distinct(email, .keep_all = TRUE) |>
+  # drop Datetime
+  select(3,4)
+
+# add solicitors data to all SSO
+all_sso <- left_join(all_sso,solicitors, key=email)
+
+# get max date solicitors
+max_date_solicitors <- summarise(solicitors, max_date = max(solicitors_created_date))
 
 
 # ======== determine active users ========
@@ -220,16 +266,19 @@ ma_rates_count <- all_sso |>
   drop_na(ma_rates_permission) |>
   count()
 bc_count <- all_sso |>
-  filter(hybris_order_type == 'BC') |>
+  filter(hybris_order_bc == 'BC') |>
   count()
 rc_count <- all_sso |>
-  filter(hybris_order_type == 'RC') |>
+  filter(hybris_order_rc == 'RC') |>
   count()
 licence_count <- all_sso |>
-  filter(hybris_order_type == 'Licence') |>
+  filter(hybris_order_licence == 'Licence') |>
   count()
 bwof_count <- all_sso |>
-  filter(hybris_order_type == 'BWOF Renewal') |>
+  filter(hybris_order_bwof == 'BWOF Renewal') |>
+  count()
+solicitors_count <- all_sso |>
+  drop_na(solicitors_created_date) |>
   count()
 
 
@@ -264,22 +313,25 @@ ma_rates_active_count <- all_sso |>
   filter(active_user == "yes") |>
   count()
 bc_active_count <- all_sso |>
-  filter(hybris_order_type == 'BC') |>
+  filter(hybris_order_bc == 'BC') |>
   filter(active_user == "yes") |>
   count()
 rc_active_count <- all_sso |>
-  filter(hybris_order_type == 'RC') |>
+  filter(hybris_order_rc == 'RC') |>
   filter(active_user == "yes") |>
   count()
 licence_active_count <- all_sso |>
-  filter(hybris_order_type == 'Licence') |>
+  filter(hybris_order_licence == 'Licence') |>
   filter(active_user == "yes") |>
   count()
 bwof_active_count <- all_sso |>
-  filter(hybris_order_type == 'BWOF Renewal') |>
+  filter(hybris_order_bwof == 'BWOF Renewal') |>
   filter(active_user == "yes") |>
   count()
-
+solicitors_active_count <- all_sso |>
+  drop_na(solicitors_created_date) |>
+  filter(active_user == "yes") |>
+  count()
 
 # assemble data frame for totals and active totals
 
@@ -293,7 +345,8 @@ product_with_active <- data.frame(
               "BC orders",
               "RC orders",
               "Licence orders",
-              "BWOF renewals"
+              "BWOF renewals",
+              "Solicitors rates statement"
               ),
   total = c(ma_dogs_count$n[1],
             ma_rates_count$n[1],
@@ -304,7 +357,8 @@ product_with_active <- data.frame(
             bc_count$n[1],
             rc_count$n[1],
             licence_count$n[1],
-            bwof_count$n[1]
+            bwof_count$n[1],
+            solicitors_count$n[1]
             ),
   active = c(ma_dogs_active_count$n[1],
              ma_rates_active_count$n[1],
@@ -315,10 +369,13 @@ product_with_active <- data.frame(
              bc_active_count$n[1],
              rc_active_count$n[1],
              licence_active_count$n[1],
-             bwof_active_count$n[1]
+             bwof_active_count$n[1],
+             solicitors_active_count$n[1]
              )
 ) |>
   mutate(percent_active = (active/total), percent_active = scales::percent(percent_active))
+
+view(product_with_active)
 
 # ======== analyse 2. check the max dates ========
 
@@ -330,7 +387,7 @@ max_date_venue_hire
 max_date_libr_room_booking
 max_date_sports_sphere_booking
 max_date_hybris_orders
-
+max_date_solicitors
 
 # ======== analyse 3. intersection of each one ========
 
@@ -354,16 +411,19 @@ ma_rates_intersect_sports <- ma_rates_intersect |>
   drop_na(sports_sphere_booking_created_date) |>
   count()
 ma_rates_intersect_bc <- ma_rates_intersect |>
-  filter(hybris_order_type == 'BC') |>
+  filter(hybris_order_bc == 'BC') |>
   count()
 ma_rates_intersect_rc <- ma_rates_intersect |>
-  filter(hybris_order_type == 'RC') |>
+  filter(hybris_order_rc == 'RC') |>
   count()
 ma_rates_intersect_licence <- ma_rates_intersect |>
-  filter(hybris_order_type == 'Licence') |>
+  filter(hybris_order_licence == 'Licence') |>
   count()
 ma_rates_intersect_bwof <- ma_rates_intersect |>
-  filter(hybris_order_type == 'BWOF Renewal') |>
+  filter(hybris_order_bwof == 'BWOF Renewal') |>
+  count()
+ma_rates_intersect_solicitors <- ma_rates_intersect |>
+  drop_na(solicitors_created_date) |>
   count()
 ma_rates_intersect_none <- ma_rates_intersect |>
   filter(is.na(ma_dogs_update_type)) |>
@@ -371,7 +431,11 @@ ma_rates_intersect_none <- ma_rates_intersect |>
   filter(is.na(venue_hire_booking_status)) |>
   filter(is.na(libr_room_booking_status)) |>
   filter(is.na(sports_sphere_booking_created_date)) |>
-  filter(is.na(hybris_order_type)) |>
+  filter(is.na(hybris_order_bc)) |>
+  filter(is.na(hybris_order_rc)) |>
+  filter(is.na(hybris_order_licence)) |>
+  filter(is.na(hybris_order_bwof)) |>
+  filter(is.na(solicitors_created_date)) |>
   count()
 
 
@@ -385,6 +449,7 @@ ma_rates_intersect_results <- data.frame(
               "RC orders",
               "Licence orders",
               "BWOF renewals",
+              "Solicitors rates account",
               "None (myAUCKLAND rates is the only thing)"
   ),
   total = c(ma_rates_intersect_dogs$n[1],
@@ -396,10 +461,13 @@ ma_rates_intersect_results <- data.frame(
             ma_rates_intersect_rc$n[1],
             ma_rates_intersect_licence$n[1],
             ma_rates_intersect_bwof$n[1],
+            ma_rates_intersect_solicitors$n[1],
             ma_rates_intersect_none$n[1]
   )
 ) |>
   mutate(percent_users = (total/ma_rates_count$n[1]), percent_users = scales::percent(percent_users))
+
+view(ma_rates_intersect_results)
 
 
 # intersection of dogs with others
@@ -422,16 +490,19 @@ ma_dogs_intersect_sports <- ma_dogs_intersect |>
   drop_na(sports_sphere_booking_created_date) |>
   count()
 ma_dogs_intersect_bc <- ma_dogs_intersect |>
-  filter(hybris_order_type == 'BC') |>
+  filter(hybris_order_bc == 'BC') |>
   count()
 ma_dogs_intersect_rc <- ma_dogs_intersect |>
-  filter(hybris_order_type == 'RC') |>
+  filter(hybris_order_rc == 'RC') |>
   count()
 ma_dogs_intersect_licence <- ma_dogs_intersect |>
-  filter(hybris_order_type == 'Licence') |>
+  filter(hybris_order_licence == 'Licence') |>
   count()
 ma_dogs_intersect_bwof <- ma_dogs_intersect |>
-  filter(hybris_order_type == 'BWOF Renewal') |>
+  filter(hybris_order_bwof == 'BWOF Renewal') |>
+  count()
+ma_dogs_intersect_solicitors <- ma_dogs_intersect |>
+  drop_na(solicitors_created_date) |>
   count()
 ma_dogs_intersect_none <- ma_dogs_intersect |>
   filter(is.na(ma_rates_permission)) |>
@@ -439,7 +510,11 @@ ma_dogs_intersect_none <- ma_dogs_intersect |>
   filter(is.na(venue_hire_booking_status)) |>
   filter(is.na(libr_room_booking_status)) |>
   filter(is.na(sports_sphere_booking_created_date)) |>
-  filter(is.na(hybris_order_type)) |>
+  filter(is.na(hybris_order_bc)) |>
+  filter(is.na(hybris_order_rc)) |>
+  filter(is.na(hybris_order_licence)) |>
+  filter(is.na(hybris_order_bwof)) |>
+  filter(is.na(solicitors_created_date)) |>
   count()
 
 
@@ -453,6 +528,7 @@ ma_dogs_intersect_results <- data.frame(
               "RC orders",
               "Licence orders",
               "BWOF renewals",
+              "Solicitors rates account",
               "None (myAUCKLAND Dogs is the only thing)"
   ),
   total = c(ma_dogs_intersect_rates$n[1],
@@ -464,10 +540,13 @@ ma_dogs_intersect_results <- data.frame(
             ma_dogs_intersect_rc$n[1],
             ma_dogs_intersect_licence$n[1],
             ma_dogs_intersect_bwof$n[1],
+            ma_dogs_intersect_solicitors$n[1],
             ma_dogs_intersect_none$n[1]
   )
 ) |>
   mutate(percent_users = (total/ma_dogs_count$n[1]), percent_users = scales::percent(percent_users))
+
+view(ma_dogs_intersect_results)
 
 
 # intersection of venue hire with others
@@ -490,16 +569,19 @@ venue_hire_intersect_sports <- venue_hire_intersect |>
   drop_na(sports_sphere_booking_created_date) |>
   count()
 venue_hire_intersect_bc <- venue_hire_intersect |>
-  filter(hybris_order_type == 'BC') |>
+  filter(hybris_order_bc == 'BC') |>
   count()
 venue_hire_intersect_rc <- venue_hire_intersect |>
-  filter(hybris_order_type == 'RC') |>
+  filter(hybris_order_rc == 'RC') |>
   count()
 venue_hire_intersect_licence <- venue_hire_intersect |>
-  filter(hybris_order_type == 'Licence') |>
+  filter(hybris_order_licence == 'Licence') |>
   count()
 venue_hire_intersect_bwof <- venue_hire_intersect |>
-  filter(hybris_order_type == 'BWOF Renewal') |>
+  filter(hybris_order_bwof == 'BWOF Renewal') |>
+  count()
+venue_hire_intersect_solicitors <- venue_hire_intersect |>
+  drop_na(solicitors_created_date) |>
   count()
 venue_hire_intersect_none <- venue_hire_intersect |>
   filter(is.na(ma_rates_permission)) |>
@@ -507,7 +589,11 @@ venue_hire_intersect_none <- venue_hire_intersect |>
   filter(is.na(accomm_booking_status)) |>
   filter(is.na(libr_room_booking_status)) |>
   filter(is.na(sports_sphere_booking_created_date)) |>
-  filter(is.na(hybris_order_type)) |>
+  filter(is.na(hybris_order_bc)) |>
+  filter(is.na(hybris_order_rc)) |>
+  filter(is.na(hybris_order_licence)) |>
+  filter(is.na(hybris_order_bwof)) |>
+  filter(is.na(solicitors_created_date)) |>
   count()
 
 
@@ -521,6 +607,7 @@ venue_hire_intersect_results <- data.frame(
               "RC orders",
               "Licence orders",
               "BWOF renewals",
+              "Solicitors rates account",
               "None (Venue hire is the only thing)"
   ),
   total = c(venue_hire_intersect_rates$n[1],
@@ -532,10 +619,13 @@ venue_hire_intersect_results <- data.frame(
             venue_hire_intersect_rc$n[1],
             venue_hire_intersect_licence$n[1],
             venue_hire_intersect_bwof$n[1],
+            venue_hire_intersect_solicitors$n[1],
             venue_hire_intersect_none$n[1]
   )
 ) |>
   mutate(percent_users = (total/venue_hire_count$n[1]), percent_users = scales::percent(percent_users))
+
+view(venue_hire_intersect_results)
 
 
 # intersection of accomm booking with others
@@ -558,16 +648,19 @@ accomm_booking_intersect_sports <- accomm_booking_intersect |>
   drop_na(sports_sphere_booking_created_date) |>
   count()
 accomm_booking_intersect_bc <- accomm_booking_intersect |>
-  filter(hybris_order_type == 'BC') |>
+  filter(hybris_order_bc == 'BC') |>
   count()
 accomm_booking_intersect_rc <- accomm_booking_intersect |>
-  filter(hybris_order_type == 'RC') |>
+  filter(hybris_order_rc == 'RC') |>
   count()
 accomm_booking_intersect_licence <- accomm_booking_intersect |>
-  filter(hybris_order_type == 'Licence') |>
+  filter(hybris_order_licence == 'Licence') |>
   count()
 accomm_booking_intersect_bwof <- accomm_booking_intersect |>
-  filter(hybris_order_type == 'BWOF Renewal') |>
+  filter(hybris_order_bwof == 'BWOF Renewal') |>
+  count()
+accomm_booking_intersect_solicitors <- accomm_booking_intersect |>
+  drop_na(solicitors_created_date) |>
   count()
 accomm_booking_intersect_none <- accomm_booking_intersect |>
   filter(is.na(ma_rates_permission)) |>
@@ -575,7 +668,11 @@ accomm_booking_intersect_none <- accomm_booking_intersect |>
   filter(is.na(venue_hire_booking_status)) |>
   filter(is.na(libr_room_booking_status)) |>
   filter(is.na(sports_sphere_booking_created_date)) |>
-  filter(is.na(hybris_order_type)) |>
+  filter(is.na(hybris_order_bc)) |>
+  filter(is.na(hybris_order_rc)) |>
+  filter(is.na(hybris_order_licence)) |>
+  filter(is.na(hybris_order_bwof)) |>
+  filter(is.na(solicitors_created_date)) |>
   count()
 
 
@@ -589,6 +686,7 @@ accomm_booking_intersect_results <- data.frame(
               "RC orders",
               "Licence orders",
               "BWOF renewals",
+              "Solicitors rates account",
               "None (Accomm booking is the only thing)"
   ),
   total = c(accomm_booking_intersect_rates$n[1],
@@ -600,10 +698,13 @@ accomm_booking_intersect_results <- data.frame(
             accomm_booking_intersect_rc$n[1],
             accomm_booking_intersect_licence$n[1],
             accomm_booking_intersect_bwof$n[1],
+            accomm_booking_intersect_solicitors$n[1],
             accomm_booking_intersect_none$n[1]
   )
 ) |>
   mutate(percent_users = (total/accomm_booking_count$n[1]), percent_users = scales::percent(percent_users))
+
+view(accomm_booking_intersect_results)
 
 
 # intersection of library room booking with others
@@ -626,16 +727,19 @@ libr_room_booking_intersect_sports <- libr_room_booking_intersect |>
   drop_na(sports_sphere_booking_created_date) |>
   count()
 libr_room_booking_intersect_bc <- libr_room_booking_intersect |>
-  filter(hybris_order_type == 'BC') |>
+  filter(hybris_order_bc == 'BC') |>
   count()
 libr_room_booking_intersect_rc <- libr_room_booking_intersect |>
-  filter(hybris_order_type == 'RC') |>
+  filter(hybris_order_rc == 'RC') |>
   count()
 libr_room_booking_intersect_licence <- libr_room_booking_intersect |>
-  filter(hybris_order_type == 'Licence') |>
+  filter(hybris_order_licence == 'Licence') |>
   count()
 libr_room_booking_intersect_bwof <- libr_room_booking_intersect |>
-  filter(hybris_order_type == 'BWOF Renewal') |>
+  filter(hybris_order_bwof == 'BWOF Renewal') |>
+  count()
+libr_room_booking_intersect_solicitors <- libr_room_booking_intersect |>
+  drop_na(solicitors_created_date) |>
   count()
 libr_room_booking_intersect_none <- libr_room_booking_intersect |>
   filter(is.na(ma_rates_permission)) |>
@@ -643,7 +747,11 @@ libr_room_booking_intersect_none <- libr_room_booking_intersect |>
   filter(is.na(venue_hire_booking_status)) |>
   filter(is.na(accomm_booking_status)) |>
   filter(is.na(sports_sphere_booking_created_date)) |>
-  filter(is.na(hybris_order_type)) |>
+  filter(is.na(hybris_order_bc)) |>
+  filter(is.na(hybris_order_rc)) |>
+  filter(is.na(hybris_order_licence)) |>
+  filter(is.na(hybris_order_bwof)) |>
+  filter(is.na(solicitors_created_date)) |>
   count()
 
 
@@ -657,6 +765,7 @@ libr_room_booking_intersect_results <- data.frame(
               "RC orders",
               "Licence orders",
               "BWOF renewals",
+              "Solicitors rates account",
               "None (Library room booking is the only thing)"
   ),
   total = c(libr_room_booking_intersect_rates$n[1],
@@ -668,11 +777,13 @@ libr_room_booking_intersect_results <- data.frame(
             libr_room_booking_intersect_rc$n[1],
             libr_room_booking_intersect_licence$n[1],
             libr_room_booking_intersect_bwof$n[1],
+            libr_room_booking_intersect_solicitors$n[1],
             libr_room_booking_intersect_none$n[1]
   )
 ) |>
   mutate(percent_users = (total/libr_room_booking_count$n[1]), percent_users = scales::percent(percent_users))
 
+view(libr_room_booking_intersect_results)
 
 
 # intersection of sports field booking with others
@@ -695,16 +806,19 @@ sports_booking_intersect_library <- sports_booking_intersect |>
   drop_na(libr_room_booking_status) |>
   count()
 sports_booking_intersect_bc <- sports_booking_intersect |>
-  filter(hybris_order_type == 'BC') |>
+  filter(hybris_order_bc == 'BC') |>
   count()
 sports_booking_intersect_rc <- sports_booking_intersect |>
-  filter(hybris_order_type == 'RC') |>
+  filter(hybris_order_rc == 'RC') |>
   count()
 sports_booking_intersect_licence <- sports_booking_intersect |>
-  filter(hybris_order_type == 'Licence') |>
+  filter(hybris_order_licence == 'Licence') |>
   count()
 sports_booking_intersect_bwof <- sports_booking_intersect |>
-  filter(hybris_order_type == 'BWOF Renewal') |>
+  filter(hybris_order_bwof == 'BWOF Renewal') |>
+  count()
+sports_booking_intersect_solicitors <- sports_booking_intersect |>
+  drop_na(solicitors_created_date) |>
   count()
 sports_booking_intersect_none <- sports_booking_intersect |>
   filter(is.na(ma_rates_permission)) |>
@@ -712,7 +826,11 @@ sports_booking_intersect_none <- sports_booking_intersect |>
   filter(is.na(venue_hire_booking_status)) |>
   filter(is.na(accomm_booking_status)) |>
   filter(is.na(libr_room_booking_status)) |>
-  filter(is.na(hybris_order_type)) |>
+  filter(is.na(hybris_order_bc)) |>
+  filter(is.na(hybris_order_rc)) |>
+  filter(is.na(hybris_order_licence)) |>
+  filter(is.na(hybris_order_bwof)) |>
+  filter(is.na(solicitors_created_date)) |>
   count()
 
 
@@ -726,6 +844,7 @@ sports_booking_intersect_results <- data.frame(
               "RC orders",
               "Licence orders",
               "BWOF renewals",
+              "Solicitors rates account",
               "None (Sports field booking is the only thing)"
   ),
   total = c(sports_booking_intersect_rates$n[1],
@@ -737,7 +856,449 @@ sports_booking_intersect_results <- data.frame(
             sports_booking_intersect_rc$n[1],
             sports_booking_intersect_licence$n[1],
             sports_booking_intersect_bwof$n[1],
+            sports_booking_intersect_solicitors$n[1],
             sports_booking_intersect_none$n[1]
   )
 ) |>
   mutate(percent_users = (total/sports_sphere_booking_count$n[1]), percent_users = scales::percent(percent_users))
+
+view(sports_booking_intersect_results)
+
+
+# intersection of BC orders with others
+
+bc_orders_intersect <- all_sso |>
+  filter(hybris_order_bc == 'BC')
+bc_orders_intersect_rates <- bc_orders_intersect |>
+  drop_na(ma_rates_permission) |>
+  count()
+bc_orders_intersect_dogs <- bc_orders_intersect |>
+  filter(ma_dogs_update_type == 'New') |>
+  count()
+bc_orders_intersect_venues <- bc_orders_intersect |>
+  drop_na(venue_hire_booking_status) |>
+  count()
+bc_orders_intersect_accomm <- bc_orders_intersect |>
+  drop_na(accomm_booking_status) |>
+  count()
+bc_orders_intersect_library <- bc_orders_intersect |>
+  drop_na(libr_room_booking_status) |>
+  count()
+bc_orders_intersect_sports <- bc_orders_intersect |>
+  drop_na(sports_sphere_booking_created_date) |>
+  count()
+bc_orders_intersect_rc <- bc_orders_intersect |>
+  filter(hybris_order_rc == 'RC') |>
+  count()
+bc_orders_intersect_licence <- bc_orders_intersect |>
+  filter(hybris_order_licence == 'Licence') |>
+  count()
+bc_orders_intersect_bwof <- bc_orders_intersect |>
+  filter(hybris_order_bwof == 'BWOF Renewal') |>
+  count()
+bc_orders_intersect_solicitors <- bc_orders_intersect |>
+  drop_na(solicitors_created_date) |>
+  count()
+bc_orders_intersect_none <- bc_orders_intersect |>
+  filter(is.na(ma_rates_permission)) |>
+  filter(is.na(ma_dogs_update_type)) |>
+  filter(is.na(venue_hire_booking_status)) |>
+  filter(is.na(accomm_booking_status)) |>
+  filter(is.na(libr_room_booking_status)) |>
+  filter(is.na(sports_sphere_booking_created_date)) |>
+  filter(is.na(hybris_order_rc)) |>
+  filter(is.na(hybris_order_licence)) |>
+  filter(is.na(hybris_order_bwof)) |>
+  filter(is.na(solicitors_created_date)) |>
+  count()
+
+
+bc_orders_intersect_results <- data.frame(
+  product = c("myAUCKLAND Rates",
+              "myAUCKLAND Dogs",
+              "Venue hire",
+              "Accomm booking",
+              "Library room booking",
+              "Sports field booking (OLD)",
+              "RC orders",
+              "Licence orders",
+              "BWOF renewals",
+              "Solicitors rates account",
+              "None (BC orders is the only thing)"
+  ),
+  total = c(bc_orders_intersect_rates$n[1],
+            bc_orders_intersect_dogs$n[1],
+            bc_orders_intersect_venues$n[1],
+            bc_orders_intersect_accomm$n[1],
+            bc_orders_intersect_library$n[1],
+            bc_orders_intersect_sports$n[1],
+            bc_orders_intersect_rc$n[1],
+            bc_orders_intersect_licence$n[1],
+            bc_orders_intersect_bwof$n[1],
+            bc_orders_intersect_solicitors$n[1],
+            bc_orders_intersect_none$n[1]
+  )
+) |>
+  mutate(percent_users = (total/bc_count$n[1]), percent_users = scales::percent(percent_users))
+
+view(bc_orders_intersect_results)
+
+
+# intersection of RC orders with others
+
+rc_orders_intersect <- all_sso |>
+  filter(hybris_order_rc == 'RC')
+rc_orders_intersect_rates <- rc_orders_intersect |>
+  drop_na(ma_rates_permission) |>
+  count()
+rc_orders_intersect_dogs <- rc_orders_intersect |>
+  filter(ma_dogs_update_type == 'New') |>
+  count()
+rc_orders_intersect_venues <- rc_orders_intersect |>
+  drop_na(venue_hire_booking_status) |>
+  count()
+rc_orders_intersect_accomm <- rc_orders_intersect |>
+  drop_na(accomm_booking_status) |>
+  count()
+rc_orders_intersect_library <- rc_orders_intersect |>
+  drop_na(libr_room_booking_status) |>
+  count()
+rc_orders_intersect_sports <- rc_orders_intersect |>
+  drop_na(sports_sphere_booking_created_date) |>
+  count()
+rc_orders_intersect_bc <- rc_orders_intersect |>
+  filter(hybris_order_bc == 'BC') |>
+  count()
+rc_orders_intersect_licence <- rc_orders_intersect |>
+  filter(hybris_order_licence == 'Licence') |>
+  count()
+rc_orders_intersect_bwof <- rc_orders_intersect |>
+  filter(hybris_order_bwof == 'BWOF Renewal') |>
+  count()
+rc_orders_intersect_solicitors <- rc_orders_intersect |>
+  drop_na(solicitors_created_date) |>
+  count()
+rc_orders_intersect_none <- rc_orders_intersect |>
+  filter(is.na(ma_rates_permission)) |>
+  filter(is.na(ma_dogs_update_type)) |>
+  filter(is.na(venue_hire_booking_status)) |>
+  filter(is.na(accomm_booking_status)) |>
+  filter(is.na(libr_room_booking_status)) |>
+  filter(is.na(sports_sphere_booking_created_date)) |>
+  filter(is.na(hybris_order_bc)) |>
+  filter(is.na(hybris_order_licence)) |>
+  filter(is.na(hybris_order_bwof)) |>
+  filter(is.na(solicitors_created_date)) |>
+  count()
+
+
+rc_orders_intersect_results <- data.frame(
+  product = c("myAUCKLAND Rates",
+              "myAUCKLAND Dogs",
+              "Venue hire",
+              "Accomm booking",
+              "Library room booking",
+              "Sports field booking (OLD)",
+              "BC orders",
+              "Licence orders",
+              "BWOF renewals",
+              "Solicitors rates account",
+              "None (RC orders is the only thing)"
+  ),
+  total = c(rc_orders_intersect_rates$n[1],
+            rc_orders_intersect_dogs$n[1],
+            rc_orders_intersect_venues$n[1],
+            rc_orders_intersect_accomm$n[1],
+            rc_orders_intersect_library$n[1],
+            rc_orders_intersect_sports$n[1],
+            rc_orders_intersect_bc$n[1],
+            rc_orders_intersect_licence$n[1],
+            rc_orders_intersect_bwof$n[1],
+            rc_orders_intersect_solicitors$n[1],
+            rc_orders_intersect_none$n[1]
+  )
+) |>
+  mutate(percent_users = (total/rc_count$n[1]), percent_users = scales::percent(percent_users))
+
+view(rc_orders_intersect_results)
+
+
+# intersection of Licence orders with others
+
+licence_orders_intersect <- all_sso |>
+  filter(hybris_order_licence == 'Licence')
+licence_orders_intersect_rates <- licence_orders_intersect |>
+  drop_na(ma_rates_permission) |>
+  count()
+licence_orders_intersect_dogs <- licence_orders_intersect |>
+  filter(ma_dogs_update_type == 'New') |>
+  count()
+licence_orders_intersect_venues <- licence_orders_intersect |>
+  drop_na(venue_hire_booking_status) |>
+  count()
+licence_orders_intersect_accomm <- licence_orders_intersect |>
+  drop_na(accomm_booking_status) |>
+  count()
+licence_orders_intersect_library <- licence_orders_intersect |>
+  drop_na(libr_room_booking_status) |>
+  count()
+licence_orders_intersect_sports <- licence_orders_intersect |>
+  drop_na(sports_sphere_booking_created_date) |>
+  count()
+licence_orders_intersect_bc <- licence_orders_intersect |>
+  filter(hybris_order_bc == 'BC') |>
+  count()
+licence_orders_intersect_rc <- licence_orders_intersect |>
+  filter(hybris_order_rc == 'RC') |>
+  count()
+licence_orders_intersect_bwof <- licence_orders_intersect |>
+  filter(hybris_order_bwof == 'BWOF Renewal') |>
+  count()
+licence_orders_intersect_solicitors <- licence_orders_intersect |>
+  drop_na(solicitors_created_date) |>
+  count()
+licence_orders_intersect_none <- licence_orders_intersect |>
+  filter(is.na(ma_rates_permission)) |>
+  filter(is.na(ma_dogs_update_type)) |>
+  filter(is.na(venue_hire_booking_status)) |>
+  filter(is.na(accomm_booking_status)) |>
+  filter(is.na(libr_room_booking_status)) |>
+  filter(is.na(sports_sphere_booking_created_date)) |>
+  filter(is.na(hybris_order_bc)) |>
+  filter(is.na(hybris_order_rc)) |>
+  filter(is.na(hybris_order_bwof)) |>
+  filter(is.na(solicitors_created_date)) |>
+  count()
+
+
+licence_orders_intersect_results <- data.frame(
+  product = c("myAUCKLAND Rates",
+              "myAUCKLAND Dogs",
+              "Venue hire",
+              "Accomm booking",
+              "Library room booking",
+              "Sports field booking (OLD)",
+              "BC orders",
+              "RC orders",
+              "BWOF renewals",
+              "Solicitors rates account",
+              "None (Licence orders is the only thing)"
+  ),
+  total = c(licence_orders_intersect_rates$n[1],
+            licence_orders_intersect_dogs$n[1],
+            licence_orders_intersect_venues$n[1],
+            licence_orders_intersect_accomm$n[1],
+            licence_orders_intersect_library$n[1],
+            licence_orders_intersect_sports$n[1],
+            licence_orders_intersect_bc$n[1],
+            licence_orders_intersect_rc$n[1],
+            licence_orders_intersect_bwof$n[1],
+            licence_orders_intersect_solicitors$n[1],
+            licence_orders_intersect_none$n[1]
+  )
+) |>
+  mutate(percent_users = (total/licence_count$n[1]), percent_users = scales::percent(percent_users))
+
+view(licence_orders_intersect_results)
+
+
+# intersection of BWOF orders with others
+
+bwof_orders_intersect <- all_sso |>
+  filter(hybris_order_bwof == 'BWOF Renewal')
+bwof_orders_intersect_rates <- bwof_orders_intersect |>
+  drop_na(ma_rates_permission) |>
+  count()
+bwof_orders_intersect_dogs <- bwof_orders_intersect |>
+  filter(ma_dogs_update_type == 'New') |>
+  count()
+bwof_orders_intersect_venues <- bwof_orders_intersect |>
+  drop_na(venue_hire_booking_status) |>
+  count()
+bwof_orders_intersect_accomm <- bwof_orders_intersect |>
+  drop_na(accomm_booking_status) |>
+  count()
+bwof_orders_intersect_library <- bwof_orders_intersect |>
+  drop_na(libr_room_booking_status) |>
+  count()
+bwof_orders_intersect_sports <- bwof_orders_intersect |>
+  drop_na(sports_sphere_booking_created_date) |>
+  count()
+bwof_orders_intersect_bc <- bwof_orders_intersect |>
+  filter(hybris_order_bc == 'BC') |>
+  count()
+bwof_orders_intersect_rc <- bwof_orders_intersect |>
+  filter(hybris_order_rc == 'RC') |>
+  count()
+bwof_orders_intersect_licence <- bwof_orders_intersect |>
+  filter(hybris_order_licence == 'Licence') |>
+  count()
+bwof_orders_intersect_solicitors <- bwof_orders_intersect |>
+  drop_na(solicitors_created_date) |>
+  count()
+bwof_orders_intersect_none <- bwof_orders_intersect |>
+  filter(is.na(ma_rates_permission)) |>
+  filter(is.na(ma_dogs_update_type)) |>
+  filter(is.na(venue_hire_booking_status)) |>
+  filter(is.na(accomm_booking_status)) |>
+  filter(is.na(libr_room_booking_status)) |>
+  filter(is.na(sports_sphere_booking_created_date)) |>
+  filter(is.na(hybris_order_bc)) |>
+  filter(is.na(hybris_order_rc)) |>
+  filter(is.na(hybris_order_licence)) |>
+  filter(is.na(solicitors_created_date)) |>
+  count()
+
+
+bwof_orders_intersect_results <- data.frame(
+  product = c("myAUCKLAND Rates",
+              "myAUCKLAND Dogs",
+              "Venue hire",
+              "Accomm booking",
+              "Library room booking",
+              "Sports field booking (OLD)",
+              "BC orders",
+              "RC orders",
+              "Licence orders",
+              "Solicitors rates account",
+              "None (BWOF renewals is the only thing)"
+  ),
+  total = c(bwof_orders_intersect_rates$n[1],
+            bwof_orders_intersect_dogs$n[1],
+            bwof_orders_intersect_venues$n[1],
+            bwof_orders_intersect_accomm$n[1],
+            bwof_orders_intersect_library$n[1],
+            bwof_orders_intersect_sports$n[1],
+            bwof_orders_intersect_bc$n[1],
+            bwof_orders_intersect_rc$n[1],
+            bwof_orders_intersect_licence$n[1],
+            bwof_orders_intersect_solicitors$n[1],
+            bwof_orders_intersect_none$n[1]
+  )
+) |>
+  mutate(percent_users = (total/bwof_count$n[1]), percent_users = scales::percent(percent_users))
+
+view(bwof_orders_intersect_results)
+
+
+# intersection of Solicitors rates account with others
+
+solicitors_intersect <- all_sso |>
+  drop_na(solicitors_created_date)
+solicitors_intersect_rates <- solicitors_intersect |>
+  drop_na(ma_rates_permission) |>
+  count()
+solicitors_intersect_dogs <- solicitors_intersect |>
+  filter(ma_dogs_update_type == 'New') |>
+  count()
+solicitors_intersect_venues <- solicitors_intersect |>
+  drop_na(venue_hire_booking_status) |>
+  count()
+solicitors_intersect_accomm <- solicitors_intersect |>
+  drop_na(accomm_booking_status) |>
+  count()
+solicitors_intersect_library <- solicitors_intersect |>
+  drop_na(libr_room_booking_status) |>
+  count()
+solicitors_intersect_sports <- solicitors_intersect |>
+  drop_na(sports_sphere_booking_created_date) |>
+  count()
+solicitors_intersect_bc <- solicitors_intersect |>
+  filter(hybris_order_bc == 'BC') |>
+  count()
+solicitors_intersect_rc <- solicitors_intersect |>
+  filter(hybris_order_rc == 'RC') |>
+  count()
+solicitors_intersect_licence <- solicitors_intersect |>
+  filter(hybris_order_licence == 'Licence') |>
+  count()
+solicitors_intersect_bwof <- solicitors_intersect |>
+  filter(hybris_order_bwof == 'BWOF Renewal') |>
+  count()
+solicitors_intersect_none <- solicitors_intersect |>
+  filter(is.na(ma_rates_permission)) |>
+  filter(is.na(ma_dogs_update_type)) |>
+  filter(is.na(venue_hire_booking_status)) |>
+  filter(is.na(accomm_booking_status)) |>
+  filter(is.na(libr_room_booking_status)) |>
+  filter(is.na(sports_sphere_booking_created_date)) |>
+  filter(is.na(hybris_order_bc)) |>
+  filter(is.na(hybris_order_rc)) |>
+  filter(is.na(hybris_order_licence)) |>
+  filter(is.na(hybris_order_bwof)) |>
+  count()
+
+
+solicitors_intersect_results <- data.frame(
+  product = c("myAUCKLAND Rates",
+              "myAUCKLAND Dogs",
+              "Venue hire",
+              "Accomm booking",
+              "Library room booking",
+              "Sports field booking (OLD)",
+              "BC orders",
+              "RC orders",
+              "Licence orders",
+              "BWOF renewals",
+              "None (Solicitors rates account is the only thing)"
+  ),
+  total = c(solicitors_intersect_rates$n[1],
+            solicitors_intersect_dogs$n[1],
+            solicitors_intersect_venues$n[1],
+            solicitors_intersect_accomm$n[1],
+            solicitors_intersect_library$n[1],
+            solicitors_intersect_sports$n[1],
+            solicitors_intersect_bc$n[1],
+            solicitors_intersect_rc$n[1],
+            solicitors_intersect_licence$n[1],
+            solicitors_intersect_bwof$n[1],
+            solicitors_intersect_none$n[1]
+  )
+) |>
+  mutate(percent_users = (total/solicitors_count$n[1]), percent_users = scales::percent(percent_users))
+
+view(solicitors_intersect_results)
+
+# ========= table of they only do one thing =======
+
+none_intersect_results <- data.frame(
+  product = c("myAUCKLAND Rates",
+              "myAUCKLAND Dogs",
+              "Venue hire",
+              "Accomm booking",
+              "Library room booking",
+              "Sports field booking (OLD)",
+              "BC orders",
+              "RC orders",
+              "Licence orders",
+              "BWOF renewals",
+              "Solicitors rates account"
+  ),
+  no_others = c(ma_rates_intersect_none$n[1],
+            ma_dogs_intersect_none$n[1],
+            venue_hire_intersect_none$n[1],
+            accomm_booking_intersect_none$n[1],
+            libr_room_booking_intersect_none$n[1],
+            sports_booking_intersect_none$n[1],
+            bc_orders_intersect_none$n[1],
+            rc_orders_intersect_none$n[1],
+            licence_orders_intersect_none$n[1],
+            bwof_orders_intersect_none$n[1],
+            solicitors_intersect_none$n[1]
+  ),
+  total = c(ma_rates_count$n[1],
+            ma_dogs_count$n[1],
+            venue_hire_count$n[1],
+            accomm_booking_count$n[1],
+            libr_room_booking_count$n[1],
+            sports_sphere_booking_count$n[1],
+            bc_count$n[1],
+            rc_count$n[1],
+            licence_count$n[1],
+            bwof_count$n[1],
+            solicitors_count$n[1]
+  )
+) |>
+  mutate(percent_users = (no_others/total), percent_users = scales::percent(percent_users))
+
+view(none_intersect_results)
