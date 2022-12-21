@@ -1,6 +1,4 @@
-# this takes CSV files from different sources and compares them, 
-# SSO all users is downloaded from https://signin.aucklandcouncil.govt.nz/ofis/pages/config/_stats.aspx
-
+# this takes CSV files from different sources and combines them
 
 # ======== load libraries ========
 
@@ -258,7 +256,7 @@ all_sso <- all_sso |>
             ifelse(!is.na(solicitors_created_date), 1,0)
           )
 
-view(all_sso)
+#view(all_sso)
 
 
 # ======== analyse 1. counts / totals ========
