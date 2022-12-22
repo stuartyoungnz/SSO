@@ -20,7 +20,6 @@ library(scales)
 library(readxl)
 library(knitr)
 
-
 ```
 
 ```{r}
@@ -51,6 +50,9 @@ allraw <- read.csv("AllUsers.csv") |>
 
 # get max date SSO
 max_date_sso <- summarise(allraw, max_date = max(sso_created_date))
+
+# get number of records
+total_sso_accounts <- nrow(allraw)
 
 # ======== assemble file ========
 
@@ -227,7 +229,7 @@ hybris_orders_bwof <- hybris_orders_csv_files |>
 
 # add BC orders data to all SSO
 all_sso <- left_join(all_sso,hybris_orders_bc, key=email)
-# add RC orders data to all SSO
+# add Resource consent orders data to all SSO
 all_sso <- left_join(all_sso,hybris_orders_rc, key=email)
 # add Licence orders data to all SSO
 all_sso <- left_join(all_sso,hybris_orders_licence, key=email)
@@ -468,8 +470,8 @@ product_with_active <- data.frame(
               "Venue hire",
               "Library room booking",
               "Sports field booking (OLD)",
-              "BC orders",
-              "RC orders",
+              "Building consent orders",
+              "Resource consent orders",
               "Licence orders",
               "BWOF renewals",
               "Solicitors rates statement"
@@ -504,7 +506,7 @@ product_with_active <- data.frame(
 
 kable(product_with_active, 
       col.names=c("Product","Total accounts", "Accounts still active", "Percent active"),
-      align = c('r','r','r','r')
+      align = c('l','r','r','r')
 )
 
 
@@ -524,7 +526,11 @@ I believe that this represents all the products that require a SSO user account.
 
 ## Number of services used by each user account
 
-The distribution of the number of services that a user account has used is shown in the table below. It can be seen that there are hundreds of thousands of user accounts that have never used a service. (Albeit that there are some services missing). And then most of the user accounts have only used a single service. Very few user accounts have used more than one service.
+The distribution of the number of services that a user account has used is shown in the table below. It can be seen that there are hundreds of thousands of user accounts that have never used a service, almost half of all the accounts. And then most of the user accounts have only used a single service. Very few user accounts, (only 6%), have used more than one service.
+
+::: {.callout-warning}
+Remember that there are some services that have not yet been added to this report, notably building inspection booking. The number of accounts that have apparently done nothing should decrease. 
+:::
 
 ```{r}
 #| label: tbl-distribution-of-services
@@ -535,12 +541,13 @@ The distribution of the number of services that a user account has used is shown
 
 count_number_products <- all_sso |>
   group_by(total_services) |>
-  count()
+  count(name="count_accounts") |>
+  mutate(percent_accounts = (count_accounts / total_sso_accounts), percent_accounts = scales::percent(percent_accounts))
 
 
 kable(count_number_products, 
-      col.names=c("Number of services used","Distribution of accounts"),
-      align = c('r','r')
+      col.names=c("Number of services used","Distribution of accounts", "% of all accounts"),
+      align = c('r','r','r')
 )
 
 
@@ -607,8 +614,8 @@ ma_rates_intersect_results <- data.frame(
               "Venue hire",
               "Library room booking",
               "Sports field booking (OLD)",
-              "BC orders",
-              "RC orders",
+              "Building consent orders",
+              "Resource consent orders",
               "Licence orders",
               "BWOF renewals",
               "Solicitors rates balance",
@@ -686,8 +693,8 @@ ma_dogs_intersect_results <- data.frame(
               "Venue hire",
               "Library room booking",
               "Sports field booking (OLD)",
-              "BC orders",
-              "RC orders",
+              "Building consent orders",
+              "Resource consent orders",
               "Licence orders",
               "BWOF renewals",
               "Solicitors rates balance",
@@ -765,8 +772,8 @@ venue_hire_intersect_results <- data.frame(
               "Accomm booking",
               "Library room booking",
               "Sports field booking (OLD)",
-              "BC orders",
-              "RC orders",
+              "Building consent orders",
+              "Resource consent orders",
               "Licence orders",
               "BWOF renewals",
               "Solicitors rates balance",
@@ -844,8 +851,8 @@ accomm_booking_intersect_results <- data.frame(
               "Venue hire",
               "Library room booking",
               "Sports field booking (OLD)",
-              "BC orders",
-              "RC orders",
+              "Building consent orders",
+              "Resource consent orders",
               "Licence orders",
               "BWOF renewals",
               "Solicitors rates balance",
@@ -923,8 +930,8 @@ libr_room_booking_intersect_results <- data.frame(
               "Venue hire",
               "Accomm booking",
               "Sports field booking (OLD)",
-              "BC orders",
-              "RC orders",
+              "Building consent orders",
+              "Resource consent orders",
               "Licence orders",
               "BWOF renewals",
               "Solicitors rates balance",
@@ -1002,8 +1009,8 @@ sports_booking_intersect_results <- data.frame(
               "Venue hire",
               "Accomm booking",
               "Library room booking",
-              "BC orders",
-              "RC orders",
+              "Building consent orders",
+              "Resource consent orders",
               "Licence orders",
               "BWOF renewals",
               "Solicitors rates balance",
@@ -1027,7 +1034,7 @@ sports_booking_intersect_results <- data.frame(
 # view(sports_booking_intersect_results)
 
 
-# intersection of BC orders with others
+# intersection of Building consent orders with others
 
 bc_orders_intersect <- all_sso |>
   filter(hybris_order_bc == 'BC')
@@ -1082,11 +1089,11 @@ bc_orders_intersect_results <- data.frame(
               "Accomm booking",
               "Library room booking",
               "Sports field booking (OLD)",
-              "RC orders",
+              "Resource consent orders",
               "Licence orders",
               "BWOF renewals",
               "Solicitors rates balance",
-              "None (BC orders is the only thing)"
+              "None (Building consent orders is the only thing)"
   ),
   total = c(bc_orders_intersect_rates$n[1],
             bc_orders_intersect_dogs$n[1],
@@ -1106,7 +1113,7 @@ bc_orders_intersect_results <- data.frame(
 # view(bc_orders_intersect_results)
 
 
-# intersection of RC orders with others
+# intersection of Resource consent orders with others
 
 rc_orders_intersect <- all_sso |>
   filter(hybris_order_rc == 'RC')
@@ -1161,11 +1168,11 @@ rc_orders_intersect_results <- data.frame(
               "Accomm booking",
               "Library room booking",
               "Sports field booking (OLD)",
-              "BC orders",
+              "Building consent orders",
               "Licence orders",
               "BWOF renewals",
               "Solicitors rates balance",
-              "None (RC orders is the only thing)"
+              "None (Resource consent orders is the only thing)"
   ),
   total = c(rc_orders_intersect_rates$n[1],
             rc_orders_intersect_dogs$n[1],
@@ -1240,8 +1247,8 @@ licence_orders_intersect_results <- data.frame(
               "Accomm booking",
               "Library room booking",
               "Sports field booking (OLD)",
-              "BC orders",
-              "RC orders",
+              "Building consent orders",
+              "Resource consent orders",
               "BWOF renewals",
               "Solicitors rates balance",
               "None (Licence orders is the only thing)"
@@ -1319,8 +1326,8 @@ bwof_orders_intersect_results <- data.frame(
               "Accomm booking",
               "Library room booking",
               "Sports field booking (OLD)",
-              "BC orders",
-              "RC orders",
+              "Building consent orders",
+              "Resource consent orders",
               "Licence orders",
               "Solicitors rates balance",
               "None (BWOF renewals is the only thing)"
@@ -1398,8 +1405,8 @@ solicitors_intersect_results <- data.frame(
               "Accomm booking",
               "Library room booking",
               "Sports field booking (OLD)",
-              "BC orders",
-              "RC orders",
+              "Building consent orders",
+              "Resource consent orders",
               "Licence orders",
               "BWOF renewals",
               "None (Solicitors rates balance is the only thing)"
@@ -1430,8 +1437,8 @@ none_intersect_results <- data.frame(
               "Accomm booking",
               "Library room booking",
               "Sports field booking (OLD)",
-              "BC orders",
-              "RC orders",
+              "Building consent orders",
+              "Resource consent orders",
               "Licence orders",
               "BWOF renewals",
               "Solicitors rates balance"
@@ -1479,7 +1486,7 @@ The % of the users of each service who use no other service is shown in the tabl
 
 kable(none_intersect_results, 
       col.names=c("Product","Accounts that do nothing else", "Total accounts", "Percent of accounts"),
-      align = c('r','r','r','r')
+      align = c('l','r','r','r')
 )
 
 
@@ -1503,7 +1510,7 @@ Almost 80% of the users of myAUCKLAND property rates have done nothing else with
 
 kable(ma_rates_intersect_results, 
       col.names=c("Product", "Accounts that also do this", "Percent of accounts"),
-      align = c('r','r','r')
+      align = c('l','r','r')
 )
 
 
@@ -1523,7 +1530,7 @@ Users of myAUCKLAND dogs are by far the most likely to also do something else wi
 
 kable(ma_dogs_intersect_results, 
       col.names=c("Product", "Accounts that also do this", "Percent of accounts"),
-      align = c('r','r','r')
+      align = c('l','r','r')
 )
 
 
@@ -1543,7 +1550,7 @@ Customers who have booked accommodation (or picnic sites) are very unlikely to d
 
 kable(accomm_booking_intersect_results, 
       col.names=c("Product", "Accounts that also do this", "Percent of accounts"),
-      align = c('r','r','r')
+      align = c('l','r','r')
 )
 
 
@@ -1562,7 +1569,7 @@ Customers who have booked a venue are unlikely to do anything else with their SS
 
 kable(venue_hire_intersect_results, 
       col.names=c("Product", "Accounts that also do this", "Percent of accounts"),
-      align = c('r','r','r')
+      align = c('l','r','r')
 )
 
 
@@ -1583,7 +1590,7 @@ Customers who have booked a library room are unlikely to do anything else with t
 
 kable(libr_room_booking_intersect_results, 
       col.names=c("Product", "Accounts that also do this", "Percent of accounts"),
-      align = c('r','r','r')
+      align = c('l','r','r')
 )
 
 
@@ -1603,7 +1610,7 @@ Customers who have booked a sports field are unlikely to do anything else with t
 
 kable(sports_booking_intersect_results, 
       col.names=c("Product", "Accounts that also do this", "Percent of accounts"),
-      align = c('r','r','r')
+      align = c('l','r','r')
 )
 
 ```
@@ -1623,7 +1630,7 @@ Customers who have applied for a building consent are comparatively likely to do
 
 kable(bc_orders_intersect_results, 
       col.names=c("Product", "Accounts that also do this", "Percent of accounts"),
-      align = c('r','r','r')
+      align = c('l','r','r')
 )
 
 
@@ -1645,7 +1652,7 @@ Customers who have applied for a resource consent are fairly likely to also have
 
 kable(rc_orders_intersect_results, 
       col.names=c("Product", "Accounts that also do this", "Percent of accounts"),
-      align = c('r','r','r')
+      align = c('l','r','r')
 )
 
 
@@ -1666,7 +1673,7 @@ Customers who have applied for a licence are fairly likely to also do other thin
 
 kable(licence_orders_intersect_results, 
       col.names=c("Product", "Accounts that also do this", "Percent of accounts"),
-      align = c('r','r','r')
+      align = c('l','r','r')
 )
 
 ```
@@ -1686,7 +1693,7 @@ There are so few customers who have renewed a BWOF so far that this is pointless
 
 kable(bwof_orders_intersect_results, 
       col.names=c("Product", "Accounts that also do this", "Percent of accounts"),
-      align = c('r','r','r')
+      align = c('l','r','r')
 )
 
 ```
@@ -1705,7 +1712,7 @@ Almost none of the people who have access to the solicitors request for a rates 
 
 kable(solicitors_intersect_results, 
       col.names=c("Product", "Accounts that also do this", "Percent of accounts"),
-      align = c('r','r','r')
+      align = c('l','r','r')
 )
 
 ```

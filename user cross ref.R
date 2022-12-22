@@ -19,15 +19,22 @@ all_sso <- read.csv("AllUsers.csv") |>
   select(2:4) |>
   # get the created date
   mutate(sso_created_date = ymd(substr(CreatedDate,1,8))) |>
+  # get the creation month / year
+  mutate(sso_created_month_year = ym(substr(CreatedDate,1,6))) |>
   # get the last login date
   mutate(sso_last_login_date = ymd(substr(LastLogin,1,8))) |>
   # rename email column
   rename(email = Email) |>
   # drop unneeded columns
-  select(1,4:5)
+  select(1,4:6) |>
+  # remove outlier  
+  filter(sso_created_month_year != "2016-01-01")
 
 # get max date SSO
 max_date_sso <- summarise(all_sso, max_date = max(sso_created_date))
+
+# get number of records
+total_sso_accounts <- nrow(all_sso)
 
 
 # read myAUCKLAND rates CSV
@@ -265,7 +272,9 @@ all_sso <- all_sso |>
 
 count_number_products <- all_sso |>
   group_by(total_services) |>
-  count()
+  count(name="count_accounts") |>
+  mutate(percent_accounts = (count_accounts / total_sso_accounts), percent_accounts = scales::percent(percent_accounts))
+
 view(count_number_products)
 
 # count each one
