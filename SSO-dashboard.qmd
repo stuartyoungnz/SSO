@@ -518,11 +518,12 @@ Products that have not been added yet include:
 
 - Building inspection booking
 - Swimming pool fence inspection booking
+- myAUCKLAND Report a problem
 - Sports field booking (new system)
 - Events permit application
 - Property valuation objection
 
-I believe that this represents all the products that require a SSO user account. All the remaining products can be used unauthenticated. I do not think that any reporting of the use of Report a problem while logged in, or the use of the add a problem to your myAUCKLAND is possible.
+I believe that this represents all the products that require a SSO user account. All the remaining products can be used unauthenticated.
 
 ## Number of services used by each user account
 
