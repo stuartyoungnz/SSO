@@ -39,15 +39,17 @@ max_date <- summarise(all, max_date = max(created_date))
 
 
 # ======== determine active users ========
-# get date 6 months prior to today's date
+# get date 6 or 12 months prior to today's date
 date_to_check <- Sys.Date() %m-% months(6)
+date_to_check2 <- Sys.Date() %m-% months(12)
 
 # check for dates after that date.
 # Does not handle NA correctly
 all <- all |>
   mutate(active_user = ifelse(created_date >= date_to_check, "yes", ifelse(last_login_date >= date_to_check, "yes", "no"))) |>
+  relocate(active_user, .before = created_year) |>
+  mutate(active_user2 = ifelse(created_date >= date_to_check2, "yes", ifelse(last_login_date >= date_to_check2, "yes", "no"))) |>
   relocate(active_user, .before = created_year)
-
 
 # summarise all accounts and add total row 
 creation_year <- group_by(all, created_year ) |>
@@ -63,11 +65,44 @@ creation_year_active <- all |>
   summarise(active = sum(n)) |>
   adorn_totals("row")
 
-# join all and active
+# summarise active users and add total row
+creation_year_active2 <- all |>
+  filter(active_user2 == "yes") |>
+  group_by(created_year) |>
+  count() |>
+  summarise(active = sum(n)) |>
+  adorn_totals("row")
+
+# join all and active - 6 months
 creation_year_all_with_active <- 
   left_join(creation_year,creation_year_active, key=created_year) |>
   mutate(percent_active = (active/count), percent_active = scales::percent(percent_active))
 
+view(creation_year_all_with_active)
+
+# join all and active - 12 months
+creation_year_all_with_active2 <- 
+  left_join(creation_year,creation_year_active2, key=created_year) |>
+  mutate(percent_active = (active/count), percent_active = scales::percent(percent_active))
+
+view(creation_year_all_with_active2)
+
+# join all and active - 6 and 12 months
+creation_year_active <- creation_year_active |>
+  rename('active_6_months' = active)
+creation_year_active2 <- creation_year_active2 |>
+  rename('active_12_months' = active)
+creation_year_all_with_active3 <- 
+  left_join(creation_year,creation_year_active, key=created_year)
+creation_year_all_with_active3 <- 
+  left_join(creation_year_all_with_active3,creation_year_active2, key=created_year) 
+
+creation_year_all_with_active3 <- creation_year_all_with_active3 |>
+  mutate(percent_active_6 = (active_6_months/count), percent_active_6 = scales::percent(percent_active_6)) |>
+  mutate(percent_active_12 = (active_12_months/count), percent_active_12 = scales::percent(percent_active_12)) |>
+  relocate(percent_active_6, .before = active_12_months)
+
+view(creation_year_all_with_active3)
 
 
 # summarise and add total row
