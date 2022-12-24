@@ -6,6 +6,7 @@ library(tidyverse)
 library(lubridate)
 library(janitor)
 library(scales)
+library(ggthemes)
 
 # read from CSV
 allraw <- read.csv("AllUsers.csv") |>
@@ -133,8 +134,26 @@ ggplot(creation_year_month2, aes(created_month_year, Count)) +
     date_breaks = "1 year", date_labels = "%Y",
     date_minor_breaks = "1 month"
   ) +
-  ggtitle("Monthly SSO accounts created") +
+  ggtitle("Monthly SSO accounts created") + 
+#  theme_economist() + scale_colour_economist() +
+  theme_minimal() +
   geom_line() + 
   geom_point()
 
+# plot by month
+ggplot(creation_year_month2, aes(created_month_year, Count)) +
+  labs(y = "Number SSO accounts created", x = "Month") +
+  scale_y_continuous(
+    limits = c(0, 15000),
+    expand = c(0, 0),
+    breaks = seq(0, 15000, 5000),
+    minor_breaks = seq(0, 15000, 1000)
+  ) +
+  scale_x_date(
+    date_breaks = "1 year", date_labels = "%Y",
+    date_minor_breaks = "1 month"
+  ) +
+  ggtitle("Monthly SSO accounts created") + 
+  theme_minimal() +
+  geom_area()
 

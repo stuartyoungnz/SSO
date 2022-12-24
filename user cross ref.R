@@ -7,6 +7,7 @@ library(lubridate)
 library(janitor)
 library(scales)
 library(readxl)
+library(reshape)
 
 # ======== read all data and assemble main data frame ========
 
@@ -203,9 +204,9 @@ hybris_orders_bwof <- hybris_orders_csv_files |>
   rename(hybris_order_date_bwof = hybris_order_date) |>
   distinct(email, .keep_all = TRUE)
 
-# add BC orders data to all SSO
+# add Building consents data to all SSO
 all_sso <- left_join(all_sso,hybris_orders_bc, key=email)
-# add RC orders data to all SSO
+# add Resource consents data to all SSO
 all_sso <- left_join(all_sso,hybris_orders_rc, key=email)
 # add Licence orders data to all SSO
 all_sso <- left_join(all_sso,hybris_orders_licence, key=email)
@@ -376,9 +377,9 @@ product_with_active <- data.frame(
               "Accomm booking",
               "Venue hire",
               "Library room booking",
-              "Sports field booking (OLD)",
-              "BC orders",
-              "RC orders",
+              "Sports field booking",
+              "Building consents",
+              "Resource consents",
               "Licence orders",
               "BWOF renewals",
               "Solicitors rates statement"
@@ -479,12 +480,12 @@ ma_rates_intersect_results <- data.frame(
               "Accomm booking",
               "Venue hire",
               "Library room booking",
-              "Sports field booking (OLD)",
-              "BC orders",
-              "RC orders",
+              "Sports field booking",
+              "Building consents",
+              "Resource consents",
               "Licence orders",
               "BWOF renewals",
-              "Solicitors rates account",
+              "Solicitors rates balance",
               "None (myAUCKLAND rates is the only thing)"
   ),
   total = c(ma_rates_intersect_dogs$n[1],
@@ -502,7 +503,7 @@ ma_rates_intersect_results <- data.frame(
 ) |>
   mutate(percent_users = (total/ma_rates_count$n[1]), percent_users = scales::percent(percent_users))
 
-view(ma_rates_intersect_results)
+# view(ma_rates_intersect_results)
 
 
 # intersection of dogs with others
@@ -558,12 +559,12 @@ ma_dogs_intersect_results <- data.frame(
               "Accomm booking",
               "Venue hire",
               "Library room booking",
-              "Sports field booking (OLD)",
-              "BC orders",
-              "RC orders",
+              "Sports field booking",
+              "Building consents",
+              "Resource consents",
               "Licence orders",
               "BWOF renewals",
-              "Solicitors rates account",
+              "Solicitors rates balance",
               "None (myAUCKLAND Dogs is the only thing)"
   ),
   total = c(ma_dogs_intersect_rates$n[1],
@@ -581,7 +582,7 @@ ma_dogs_intersect_results <- data.frame(
 ) |>
   mutate(percent_users = (total/ma_dogs_count$n[1]), percent_users = scales::percent(percent_users))
 
-view(ma_dogs_intersect_results)
+# view(ma_dogs_intersect_results)
 
 
 # intersection of venue hire with others
@@ -637,12 +638,12 @@ venue_hire_intersect_results <- data.frame(
               "myAUCKLAND Dogs",
               "Accomm booking",
               "Library room booking",
-              "Sports field booking (OLD)",
-              "BC orders",
-              "RC orders",
+              "Sports field booking",
+              "Building consents",
+              "Resource consents",
               "Licence orders",
               "BWOF renewals",
-              "Solicitors rates account",
+              "Solicitors rates balance",
               "None (Venue hire is the only thing)"
   ),
   total = c(venue_hire_intersect_rates$n[1],
@@ -660,7 +661,7 @@ venue_hire_intersect_results <- data.frame(
 ) |>
   mutate(percent_users = (total/venue_hire_count$n[1]), percent_users = scales::percent(percent_users))
 
-view(venue_hire_intersect_results)
+# view(venue_hire_intersect_results)
 
 
 # intersection of accomm booking with others
@@ -716,12 +717,12 @@ accomm_booking_intersect_results <- data.frame(
               "myAUCKLAND Dogs",
               "Venue hire",
               "Library room booking",
-              "Sports field booking (OLD)",
-              "BC orders",
-              "RC orders",
+              "Sports field booking",
+              "Building consents",
+              "Resource consents",
               "Licence orders",
               "BWOF renewals",
-              "Solicitors rates account",
+              "Solicitors rates balance",
               "None (Accomm booking is the only thing)"
   ),
   total = c(accomm_booking_intersect_rates$n[1],
@@ -739,7 +740,7 @@ accomm_booking_intersect_results <- data.frame(
 ) |>
   mutate(percent_users = (total/accomm_booking_count$n[1]), percent_users = scales::percent(percent_users))
 
-view(accomm_booking_intersect_results)
+# view(accomm_booking_intersect_results)
 
 
 # intersection of library room booking with others
@@ -795,12 +796,12 @@ libr_room_booking_intersect_results <- data.frame(
               "myAUCKLAND Dogs",
               "Venue hire",
               "Accomm booking",
-              "Sports field booking (OLD)",
-              "BC orders",
-              "RC orders",
+              "Sports field booking",
+              "Building consents",
+              "Resource consents",
               "Licence orders",
               "BWOF renewals",
-              "Solicitors rates account",
+              "Solicitors rates balance",
               "None (Library room booking is the only thing)"
   ),
   total = c(libr_room_booking_intersect_rates$n[1],
@@ -818,7 +819,7 @@ libr_room_booking_intersect_results <- data.frame(
 ) |>
   mutate(percent_users = (total/libr_room_booking_count$n[1]), percent_users = scales::percent(percent_users))
 
-view(libr_room_booking_intersect_results)
+# view(libr_room_booking_intersect_results)
 
 
 # intersection of sports field booking with others
@@ -875,11 +876,11 @@ sports_booking_intersect_results <- data.frame(
               "Venue hire",
               "Accomm booking",
               "Library room booking",
-              "BC orders",
-              "RC orders",
+              "Building consents",
+              "Resource consents",
               "Licence orders",
               "BWOF renewals",
-              "Solicitors rates account",
+              "Solicitors rates balance",
               "None (Sports field booking is the only thing)"
   ),
   total = c(sports_booking_intersect_rates$n[1],
@@ -897,10 +898,10 @@ sports_booking_intersect_results <- data.frame(
 ) |>
   mutate(percent_users = (total/sports_sphere_booking_count$n[1]), percent_users = scales::percent(percent_users))
 
-view(sports_booking_intersect_results)
+# view(sports_booking_intersect_results)
 
 
-# intersection of BC orders with others
+# intersection of Building consents with others
 
 bc_orders_intersect <- all_sso |>
   filter(hybris_order_bc == 'BC')
@@ -954,12 +955,12 @@ bc_orders_intersect_results <- data.frame(
               "Venue hire",
               "Accomm booking",
               "Library room booking",
-              "Sports field booking (OLD)",
-              "RC orders",
+              "Sports field booking",
+              "Resource consents",
               "Licence orders",
               "BWOF renewals",
-              "Solicitors rates account",
-              "None (BC orders is the only thing)"
+              "Solicitors rates balance",
+              "None (Building consents is the only thing)"
   ),
   total = c(bc_orders_intersect_rates$n[1],
             bc_orders_intersect_dogs$n[1],
@@ -976,10 +977,10 @@ bc_orders_intersect_results <- data.frame(
 ) |>
   mutate(percent_users = (total/bc_count$n[1]), percent_users = scales::percent(percent_users))
 
-view(bc_orders_intersect_results)
+# view(bc_orders_intersect_results)
 
 
-# intersection of RC orders with others
+# intersection of Resource consents with others
 
 rc_orders_intersect <- all_sso |>
   filter(hybris_order_rc == 'RC')
@@ -1033,12 +1034,12 @@ rc_orders_intersect_results <- data.frame(
               "Venue hire",
               "Accomm booking",
               "Library room booking",
-              "Sports field booking (OLD)",
-              "BC orders",
+              "Sports field booking",
+              "Building consents",
               "Licence orders",
               "BWOF renewals",
-              "Solicitors rates account",
-              "None (RC orders is the only thing)"
+              "Solicitors rates balance",
+              "None (Resource consents is the only thing)"
   ),
   total = c(rc_orders_intersect_rates$n[1],
             rc_orders_intersect_dogs$n[1],
@@ -1055,7 +1056,7 @@ rc_orders_intersect_results <- data.frame(
 ) |>
   mutate(percent_users = (total/rc_count$n[1]), percent_users = scales::percent(percent_users))
 
-view(rc_orders_intersect_results)
+# view(rc_orders_intersect_results)
 
 
 # intersection of Licence orders with others
@@ -1112,11 +1113,11 @@ licence_orders_intersect_results <- data.frame(
               "Venue hire",
               "Accomm booking",
               "Library room booking",
-              "Sports field booking (OLD)",
-              "BC orders",
-              "RC orders",
+              "Sports field booking",
+              "Building consents",
+              "Resource consents",
               "BWOF renewals",
-              "Solicitors rates account",
+              "Solicitors rates balance",
               "None (Licence orders is the only thing)"
   ),
   total = c(licence_orders_intersect_rates$n[1],
@@ -1134,7 +1135,7 @@ licence_orders_intersect_results <- data.frame(
 ) |>
   mutate(percent_users = (total/licence_count$n[1]), percent_users = scales::percent(percent_users))
 
-view(licence_orders_intersect_results)
+# view(licence_orders_intersect_results)
 
 
 # intersection of BWOF orders with others
@@ -1191,11 +1192,11 @@ bwof_orders_intersect_results <- data.frame(
               "Venue hire",
               "Accomm booking",
               "Library room booking",
-              "Sports field booking (OLD)",
-              "BC orders",
-              "RC orders",
+              "Sports field booking",
+              "Building consents",
+              "Resource consents",
               "Licence orders",
-              "Solicitors rates account",
+              "Solicitors rates balance",
               "None (BWOF renewals is the only thing)"
   ),
   total = c(bwof_orders_intersect_rates$n[1],
@@ -1213,10 +1214,10 @@ bwof_orders_intersect_results <- data.frame(
 ) |>
   mutate(percent_users = (total/bwof_count$n[1]), percent_users = scales::percent(percent_users))
 
-view(bwof_orders_intersect_results)
+# view(bwof_orders_intersect_results)
 
 
-# intersection of Solicitors rates account with others
+# intersection of Solicitors rates balance with others
 
 solicitors_intersect <- all_sso |>
   drop_na(solicitors_created_date)
@@ -1270,12 +1271,12 @@ solicitors_intersect_results <- data.frame(
               "Venue hire",
               "Accomm booking",
               "Library room booking",
-              "Sports field booking (OLD)",
-              "BC orders",
-              "RC orders",
+              "Sports field booking",
+              "Building consents",
+              "Resource consents",
               "Licence orders",
               "BWOF renewals",
-              "None (Solicitors rates account is the only thing)"
+              "None (Solicitors rates balance is the only thing)"
   ),
   total = c(solicitors_intersect_rates$n[1],
             solicitors_intersect_dogs$n[1],
@@ -1292,8 +1293,85 @@ solicitors_intersect_results <- data.frame(
 ) |>
   mutate(percent_users = (total/solicitors_count$n[1]), percent_users = scales::percent(percent_users))
 
-view(solicitors_intersect_results)
+# view(solicitors_intersect_results)
 
+# ========= table of all correlations =======
+
+# assemble table of correlations, making the column name be the same as the product in the rows, and making the values numeric.
+all_intersect_results <- data.frame(
+  product = c("myAUCKLAND Rates",
+              "myAUCKLAND Dogs",
+              "Venue hire",
+              "Accomm booking",
+              "Library room booking",
+              "Sports field booking",
+              "Building consents",
+              "Resource consents",
+              "Licence orders",
+              "Solicitors rates balance"
+  )) |>
+  left_join(ma_rates_intersect_results, key = product) |>
+  mutate("myAUCKLAND Rates" = as.numeric(str_replace(percent_users, "%",""))) |>
+  select(-total,-percent_users) |>
+  
+  left_join(ma_dogs_intersect_results, key = product) |>
+  mutate("myAUCKLAND Dogs" = as.numeric(str_replace(percent_users, "%",""))) |>
+  select(-total,-percent_users) |>
+
+  left_join(venue_hire_intersect_results, key = product) |>
+  mutate("Venue hire" = as.numeric(str_replace(percent_users, "%",""))) |>
+  select(-total,-percent_users) |>
+  
+  left_join(accomm_booking_intersect_results, key = product) |>
+  mutate("Accomm booking" = as.numeric(str_replace(percent_users, "%",""))) |>
+  select(-total,-percent_users) |>
+
+  left_join(libr_room_booking_intersect_results, key = product) |>
+  mutate("Library room booking" = as.numeric(str_replace(percent_users, "%",""))) |>
+  select(-total,-percent_users) |>
+  
+  left_join(sports_booking_intersect_results, key = product) |>
+  mutate("Sports field booking" = as.numeric(str_replace(percent_users, "%",""))) |>
+  select(-total,-percent_users) |>
+  
+  left_join(bc_orders_intersect_results, key = product) |>
+  mutate("Building consents" = as.numeric(str_replace(percent_users, "%",""))) |>
+  select(-total,-percent_users) |>
+  
+  left_join(rc_orders_intersect_results, key = product) |>
+  mutate("Resource consents" = as.numeric(str_replace(percent_users, "%",""))) |>
+  select(-total,-percent_users) |>
+  
+  left_join(licence_orders_intersect_results, key = product) |>
+  mutate("Licence orders" = as.numeric(str_replace(percent_users, "%",""))) |>
+  select(-total,-percent_users) |>
+
+  left_join(solicitors_intersect_results, key = product) |>
+  mutate("Solicitors rates balance" = as.numeric(str_replace(percent_users, "%",""))) |>
+  select(-total,-percent_users)
+
+# change from a data frame to a matrix and plot using heatmap() 
+# this works but the name of the product is dropped and 
+# the order of the rows is changed to alphabetical which causes the NA to no longer be aligned.
+view(all_intersect_results)
+all_intersect_results_matrix <- data.matrix(all_intersect_results, rownames.force = TRUE)
+view(all_intersect_results_matrix)
+heatmap(all_intersect_results_matrix)
+
+
+# plot using ggplot2() this requires long tidy data
+# the order of the x axis is changed to alphabetical which causes the NA to no longer be aligned.
+# default colour scale is bad
+all_intersect_results_long <- melt(all_intersect_results)
+view(all_intersect_results_long)
+
+ggp <- ggplot(all_intersect_results_long, aes(product, variable)) +
+  geom_tile(aes(fill = value)) +
+  theme(axis.text.x = element_text(angle = 90))
+ggp
+
+
+                                                # Load reshape package
 # ========= table of they only do one thing =======
 
 none_intersect_results <- data.frame(
@@ -1302,12 +1380,12 @@ none_intersect_results <- data.frame(
               "Venue hire",
               "Accomm booking",
               "Library room booking",
-              "Sports field booking (OLD)",
-              "BC orders",
-              "RC orders",
+              "Sports field booking",
+              "Building consents",
+              "Resource consents",
               "Licence orders",
               "BWOF renewals",
-              "Solicitors rates account"
+              "Solicitors rates balance"
   ),
   no_others = c(ma_rates_intersect_none$n[1],
             ma_dogs_intersect_none$n[1],
@@ -1337,6 +1415,7 @@ none_intersect_results <- data.frame(
   mutate(percent_users = (no_others/total), percent_users = scales::percent(percent_users))
 
 view(none_intersect_results)
+
 
 
 
