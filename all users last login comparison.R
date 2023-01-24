@@ -26,3 +26,5 @@ csv_files_wide <- csv_files_new |>
   # make wide
   pivot_wider(id_cols = Email, names_from = source, values_from = sso_last_login_date)
   
+
+view(csv_files_wide)
